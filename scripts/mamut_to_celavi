@@ -1,0 +1,149 @@
+#! /usr/bin/env python
+
+# ==============================================================================
+# Copyright 2020 Ko Sugawara. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Python executable for converting a MaMuT xml to CeLaVi json/csv."""
+
+import argparse
+import csv
+import json
+import xml.etree.ElementTree as ET
+
+from tqdm import tqdm
+from treelib import Tree
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input', help='MaMuT xml file to convert')
+    parser.add_argument('json', help='JSON file to output trees')
+    parser.add_argument('csv', help='CSV file to output cells')
+    args = parser.parse_args()
+
+    # create a fake root node
+    data = {}
+    data['did'] = 'xzygote'
+    data['length'] = -30.0
+    data['children'] = []
+
+    # create a list for cells
+    cells = []
+    cells.append(['cell', 'X', 'Y', 'Z'])
+
+    # load data from .xml
+    xml = ET.parse(args.input)
+    elem_model = xml.getroot().find('Model')
+    elem_spots = elem_model.find('AllSpots')
+    elem_tracks = elem_model.find('AllTracks')
+    for elem_track in tqdm(elem_tracks):
+        # build a densely-represented tree
+        tree = Tree()
+        for edge in elem_track:
+            source_id = edge.get('SPOT_SOURCE_ID')
+            target_id = edge.get('SPOT_TARGET_ID')
+            if len(tree) == 0:
+                tree.create_node(
+                    elem_spots.find(
+                        f".//*[@ID='{source_id}']").get('POSITION_T'),
+                    source_id,
+                    parent=None
+                )
+            tree.create_node(
+                elem_spots.find(
+                    f".//*[@ID='{target_id}']").get('POSITION_T'),
+                target_id,
+                parent=source_id
+            )
+
+        # build a simple tree
+        simple_tree = Tree()
+        build_simple_tree(tree, simple_tree, tree.root)
+        build_tree_dict(simple_tree,
+                        simple_tree.root,
+                        data['children'],
+                        elem_spots,
+                        cells)
+
+    # output lineage trees to JSON
+    with open(args.json, 'w') as f:
+        json.dump(data, f)
+
+    # output cells to CSV
+    with open(args.csv, 'w') as f:
+        writer = csv.writer(f, quotechar='"', quoting=csv.QUOTE_ALL)
+        writer.writerows(cells)
+
+
+def build_simple_tree(tree, simple_tree, nid, parent_nid=None):
+    """
+    Build a simple tree from densely-represented tree recursively.
+
+    Args:
+        tree: densely-represented tree (source)
+        simple_tree: simply-represented tree (destinatioin)
+        nid: node id
+        parent_nid: parent node id
+    """
+    node = tree.get_node(nid)
+    if node.is_leaf():
+        simple_tree.create_node(node.tag, nid, parent=parent_nid)
+        return
+    if tree.level(nid) == 0:
+        simple_tree.create_node(node.tag, nid)
+        parent_nid = nid
+    elif 1 < len(tree.is_branch(nid)):
+        simple_tree.create_node(node.tag, nid, parent=parent_nid)
+        parent_nid = nid
+    for child_nid in tree.is_branch(nid):
+        build_simple_tree(tree, simple_tree, child_nid, parent_nid)
+
+
+def build_tree_dict(tree, nid, children_list, elem_spots, cells):
+    """
+    Build a tree dictionary.
+
+    Args:
+        tree: simply-represented tree (source)
+        nid: node id
+        children_list: a list of tree nodes represented with dictionary
+        elem_spots: ElementTree.Element object for querying spots
+        cells: a list of cell instances (ID and XYZ coordinates)
+    """
+    node = tree.get_node(nid)
+    node_dict = {}
+    node_dict['did'] = f'ID_{nid}'
+    node_dict['length'] = float(node.tag)
+    if node.is_leaf():
+        elem_spot = elem_spots.find(f".//*[@ID='{nid}']")
+        cells.append([
+            f'ID_{nid}',
+            elem_spot.get('POSITION_X'),
+            elem_spot.get('POSITION_Y'),
+            elem_spot.get('POSITION_Z'),
+        ])
+    else:
+        node_dict['children'] = []
+        for child_nid in tree.is_branch(nid):
+            build_tree_dict(tree,
+                            child_nid,
+                            node_dict['children'],
+                            elem_spots,
+                            cells)
+    children_list.append(node_dict)
+
+
+if __name__ == '__main__':
+    main()
