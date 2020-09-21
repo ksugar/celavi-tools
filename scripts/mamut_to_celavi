@@ -51,22 +51,27 @@ def main():
     for elem_track in tqdm(elem_tracks):
         # build a densely-represented tree
         tree = Tree()
+        orphan_nid_dict = {}
+        temp_root_nid = tree.create_node().identifier
         for edge in elem_track:
             source_id = edge.get('SPOT_SOURCE_ID')
             target_id = edge.get('SPOT_TARGET_ID')
-            if len(tree) == 0:
-                tree.create_node(
-                    elem_spots.find(
-                        f".//*[@ID='{source_id}']").get('POSITION_T'),
-                    source_id,
-                    parent=None
-                )
+            if tree.contains(source_id):
+                parent = source_id
+            else:
+                parent = temp_root_nid
+                orphan_nid_dict.setdefault(source_id, []).append(target_id)
             tree.create_node(
                 elem_spots.find(
                     f".//*[@ID='{target_id}']").get('POSITION_T'),
                 target_id,
-                parent=source_id
+                parent=parent,
             )
+            if target_id in orphan_nid_dict:
+                for nid in orphan_nid_dict[target_id]:
+                    tree.move_node(nid, target_id)
+                orphan_nid_dict.pop(target_id, None)
+        tree = tree.subtree(tree.is_branch(temp_root_nid)[0])
 
         # build a simple tree
         simple_tree = Tree()
