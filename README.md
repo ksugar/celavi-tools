@@ -21,7 +21,7 @@ git clone https://github.com/ksugar/celavi-tools.git
 Run the following command at the root directory of thie repository.
 
 ```bash
-pip install .
+pip install -U .
 ```
 
 ## Usage
