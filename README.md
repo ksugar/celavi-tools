@@ -2,7 +2,7 @@
 
 ## Available tools
 
-* `mamut_to_celavi`: A python executable for converting a MaMuT xml to CeLaVi json/csv.
+* `mamut_to_celavi`: A python executable for converting a [MaMuT](https://github.com/fiji/MaMuT) xml to [CeLaVi](https://github.com/irepansalvador/CeLaVi) json/csv.
 
 ## Getting Started
 
@@ -66,5 +66,6 @@ ID_101_abc
 
 Apache-2.0 License.
 
-## Acknowledgements
-* Irepan Salvador-Martinez
+## Related projects
+* [MaMuT](https://github.com/fiji/MaMuT)
+* [CeLaVi](https://github.com/irepansalvador/CeLaVi)
