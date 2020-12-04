@@ -130,11 +130,12 @@ def build_tree_dict(tree, nid, children_list, elem_spots, cells):
     node = tree.get_node(nid)
     elem_spot = elem_spots.find(f".//*[@ID='{nid}']")
     node_dict = {}
-    node_dict['did'] = 'ID' + elem_spot.get('name')
+    did = f"ID_{elem_spot.get('ID')}_{elem_spot.get('name')}"
+    node_dict['did'] = did
     node_dict['length'] = float(node.tag)
     if node.is_leaf():
         cells.append([
-            'ID' + elem_spot.get('name'),
+            did,
             elem_spot.get('POSITION_X'),
             elem_spot.get('POSITION_Y'),
             elem_spot.get('POSITION_Z'),
